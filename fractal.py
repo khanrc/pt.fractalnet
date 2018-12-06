@@ -7,11 +7,7 @@ import numpy as np
 
 class ConvBlock(nn.Module):
     """ Conv - Dropout - BN - ReLU """
-    def __init__(self, C_in, C_out, kernel_size=3, stride=1, padding=1, dropout=None, pool=None):
-        """
-        Args:
-            - pool: max / gap. 
-        """
+    def __init__(self, C_in, C_out, kernel_size=3, stride=1, padding=1, dropout=None):
         super().__init__()
         self.conv = nn.Conv2d(C_in, C_out, kernel_size, stride, padding, bias=False)
         if dropout is not None and dropout > 0.:
@@ -19,13 +15,6 @@ class ConvBlock(nn.Module):
         else:
             self.dropout = None
         self.bn = nn.BatchNorm2d(C_out)
-        # In the original implementation, max-pool is applied in not after join, but before join.
-        if pool == 'max':
-            self.pool = nn.MaxPool2d(2)
-        elif pool == 'gap':
-            self.pool = nn.AdaptiveAvgPool2d(1)
-        else:
-            self.pool = None
 
     def forward(self, x):
         out = self.conv(x)
@@ -33,14 +22,12 @@ class ConvBlock(nn.Module):
             out = self.dropout(out)
         out = self.bn(out)
         out = F.relu_(out)
-        if self.pool:
-            out = self.pool(out)
 
         return out
 
 
 class FractalBlock(nn.Module):
-    def __init__(self, n_columns, C_in, C_out, p_local_drop, p_dropout, global_drop_ratio, pool):
+    def __init__(self, n_columns, C_in, C_out, p_local_drop, p_dropout, global_drop_ratio):
         """ Fractal block
         Args:
             - n_columns: # of columns
@@ -49,7 +36,6 @@ class FractalBlock(nn.Module):
             - p_local_drop: local droppath prob
             - p_dropout: dropout prob
             - global_drop_ratio: global droppath ratio
-            - pool: type of pooling ops
         """
         super().__init__()
 
@@ -64,9 +50,8 @@ class FractalBlock(nn.Module):
         for col in self.columns:
             for i in range(self.max_depth):
                 if (i+1) % depth == 0:
-                    pl = pool if i+1 == self.max_depth else None
                     c_in = C_in if i+1 == depth else C_out
-                    module = ConvBlock(c_in, C_out, dropout=p_dropout, pool=pl)
+                    module = ConvBlock(c_in, C_out, dropout=p_dropout)
                     self.count[i] += 1
                 else:
                     module = None
@@ -173,19 +158,14 @@ class FractalNet(nn.Module):
         for b, (C, p_dropout) in enumerate(zip(channels, dropout_probs)):
             C_in, C_out = C_out, C
             #print("Channel in = {}, Channel out = {}".format(C_in, C_out))
-            pool = 'max'
-            if b == self.B-1 and gap: # only for last block
-                pool = 'gap'
-            fb = FractalBlock(n_columns, C_in, C_out, p_local_drop, p_dropout, global_drop_ratio,
-                              pool)
+            fb = FractalBlock(n_columns, C_in, C_out, p_local_drop, p_dropout, global_drop_ratio)
             layers.append(fb)
-            # every pool is max-pool in the paper.
-            #layers.append(nn.MaxPool2d(2))
-
-            #  if b < self.B-1:
-            #      layers.append(nn.MaxPool2d(2))
-            #  else:
-            #      layers.append(nn.AdaptiveAvgPool2d(1)) # GAP for last pool
+            if gap == False or b < self.B-1:
+                # Originally, every pool is max-pool in the paper (No GAP).
+                layers.append(nn.MaxPool2d(2))
+            else:
+                # gap == True and last block
+                layers.append(nn.AdaptiveAvgPool2d(1)) # GAP
 
             size //= 2
             total_layers += fb.max_depth
@@ -196,7 +176,7 @@ class FractalNet(nn.Module):
         self.net = nn.Sequential(*layers)
         self.fc = nn.Linear(channels[-1] * size * size, n_classes)
 
-        # xavier init
+        # xavier init as in the paper
         for n, p in self.named_parameters():
             if p.dim() > 1: # weights only
                 nn.init.xavier_uniform_(p)

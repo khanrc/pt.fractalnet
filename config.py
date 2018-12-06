@@ -65,6 +65,8 @@ class Config(BaseConfig):
         self.dropout_probs = [float(p) for p in self.dropout_probs.split(',')]
         assert len(self.channels) == len(self.dropout_probs) == self.blocks
 
+        # learning rate decay 4 times.
+        # In the case of default epochs 400, lr milestone is = [200, 300, 350, 375].
         left = self.epochs // 2
         self.lr_milestone = [left]
         for i in range(3):
