@@ -1,9 +1,24 @@
 """ Config """
 import argparse
 import os
+import shutil
 
 
 class BaseConfig(argparse.Namespace):
+    def check_exists(self, name):
+        if os.path.exists(name):
+            while True:
+                r = input("The name `{}` is already exists. Delete? [y/N/q]: ".format(name))
+                r = r.lower().strip()
+                if r == 'y':
+                    shutil.rmtree(name)
+                    print("\n!!! Remove original directory !!!\n")
+                    break
+                elif r in ['n', '']: # just enter is regarded as 'N'.
+                    break
+                elif r == 'q':
+                    exit()
+
     def print_params(self, prtf=print):
         prtf("")
         prtf("Parameters:")
@@ -49,8 +64,19 @@ class Config(BaseConfig):
         #parser.add_argument('--drop_path_prob', type=float, default=0.2, help='drop path prob')
         #parser.add_argument('--resume')
         #parser.add_argument('--evaluate', action='store_true', default=False)
-        parser.add_argument('--off-drops', action='store_true', default=False)
-        parser.add_argument('--gap', action='store_true', default=False)
+
+        # EXPERIMENTS
+        exp_parser = parser.add_argument_group('Experiment')
+        exp_parser.add_argument('--off-drops', action='store_true', default=False,
+                                help='turn off all dropout and droppath')
+        #  parser.add_argument('--gap', action='store_true', default=False)
+        exp_parser.add_argument('--gap', type=int, default=0, help='0: max-pool, '
+                                '1: just replace last max-pool to avg-pool, 2: gap (no linear)')
+        exp_parser.add_argument('--init', default='xavier',
+                                help='xavier / default (pytorch default)')
+        exp_parser.add_argument('--pad', default='zero', help='zero / reflect')
+        exp_parser.add_argument('--doubling', default=False, action='store_true',
+                                help='1x1 conv channel doubling')
 
         return parser
 
@@ -58,6 +84,8 @@ class Config(BaseConfig):
         parser = self.build_parser()
         args = parser.parse_args()
         super().__init__(**vars(args))
+
+        self.check_exists(self.name)
 
         self.data = self.data.lower().strip()
         self.data_path = './data/'
@@ -74,7 +102,7 @@ class Config(BaseConfig):
             self.lr_milestone.append(self.lr_milestone[-1] + left)
 
         if self.off_drops:
-            print("!!! Dropout and droppath are off !!!")
+            print("\n!!! Dropout and droppath are off !!!\n")
             for i in range(self.blocks):
                 self.dropout_probs[i] = 0.
             self.p_local_drop = 0.
