@@ -75,7 +75,8 @@ def main():
     criterion = nn.CrossEntropyLoss().to(device)
     model = FractalNet(data_shape, config.columns, channels=config.channels,
                        p_local_drop=config.p_local_drop, dropout_probs=config.dropout_probs,
-                       global_drop_ratio=config.global_drop_ratio, gap=config.gap)
+                       global_drop_ratio=config.global_drop_ratio, gap=config.gap,
+                       init=config.init, pad_type=config.pad, doubling=config.doubling)
     model = model.to(device)
 
     # model size
