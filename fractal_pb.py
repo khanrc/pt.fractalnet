@@ -1,9 +1,8 @@
-""" Fractal Model - per sample drop path """
+""" Fractal Model - per batch drop path """
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import utils
 
 
 class Flatten(nn.Module):
@@ -91,6 +90,15 @@ class FractalBlock(nn.Module):
 
             dist //= 2
 
+    def local_drop_sampler(self, N):
+        """ drop path probs sampler """
+        drops = np.random.binomial(1, self.p_local_drop, size=[N]).astype(np.bool)
+        if drops.all(): # all droped case
+            i = np.random.randint(0, N)
+            drops[i] = False
+
+        return drops
+
     def join(self, outs):
         """ join with local drop path
         outs: [cols, N, C, H, W] (list)
@@ -110,53 +118,17 @@ class FractalBlock(nn.Module):
         out = torch.stack(outs)
         return out.mean(dim=0)
 
-    def drop_mask(self, B, global_col, n_cols):
-        """ Generate drop mask; [n_cols, B].
-        1) generate global masks
-        2) generate local masks
-        3) resurrect random path in all-dead column
-        4) concat global and local masks
-        """
-        # global drop mask
-        GB = int(B * self.global_drop_ratio)
-        gdrop_row = np.ones(n_cols, dtype=np.float32) # [n_cols]
-        gdrop_row[np.random.randint(0, n_cols)] = 0.
-        gdrop_mask = np.tile(gdrop_row.reshape(-1, 1), GB) # [n_cols, GB]
-
-        # local drop mask
-        LB = B - GB
-        ldrop_mask = np.random.binomial(1, 1.-self.p_local_drop, [n_cols, LB]).astype(np.float32)
-        alive_count = ldrop_mask.sum(axis=0)
-        # resurrect all-dead case
-        dead_indices = np.where(alive_count == 0.)[0]
-        ldrop_mask[np.random.randint(0, n_cols, size=dead_indices.shape), dead_indices] = 1.
-
-        drop_mask = np.concatenate((gdrop_mask, ldrop_mask), axis=1)
-        device = utils.get_module_device(self)
-        return torch.from_numpy(drop_mask).to(device)
-
-    def join(self, outs, global_col):
-        n_cols = len(outs)
-        if n_cols == 1:
-            return outs[0]
-
-        out = torch.stack(outs) # [n_cols, B, C, H, W]
-
-        if self.training:
-            masks = self.drop_mask(outs[0].size(0), global_col, n_cols) # [n_cols, B]
-            masks = masks.view(*masks.size(), 1, 1, 1) # unsqueeze to [n_cols, B, 1, 1, 1]
-            n_alive = masks.sum(dim=0) # [B, 1, 1, 1]
-            masked_out = out * masks # [n_cols, B, C, H, W]
-            out = masked_out.sum(dim=0) / n_alive # [B, C, H, W] / [B, 1, 1, 1]
-        else:
-            out = out.mean(dim=0) # no drop case
+    def forward_global(self, x, global_col):
+        """ Global drop path """
+        out = self.doubler(x) if self.doubler else x
+        dist = 2 ** (self.n_columns-1 - global_col) # distance between module
+        for i in range(dist-1, self.max_depth, dist):
+            out = self.columns[global_col][i](out)
 
         return out
 
-    def forward(self, x, global_col=None):
-        if global_col is None:
-            global_col = np.random.randint(0, self.n_columns)
-
+    def forward_local(self, x):
+        """ Local drop path """
         out = self.doubler(x) if self.doubler else x
         outs = [out] * self.n_columns
         for i in range(self.max_depth):
@@ -170,12 +142,29 @@ class FractalBlock(nn.Module):
 
             # join
             #print("join in depth = {}, # of in_join = {}".format(i, len(cur_out)))
-            joined = self.join(cur_outs, global_col)
+            joined = self.join(cur_outs)
 
             for c in range(st, self.n_columns):
                 outs[c] = joined
 
         return outs[0]
+
+    def forward(self, x, deepest=False):
+        if self.training == False:
+            # eval
+            if deepest:
+                deepest_col = self.n_columns-1
+                return self.forward_global(x, deepest_col)
+            else:
+                return self.forward_local(x)
+        else:
+            # training
+            if np.random.rand() < self.global_drop_ratio:
+                global_col = np.random.randint(0, self.n_columns)
+                return self.forward_global(x, global_col)
+            else:
+                return self.forward_local(x)
+
 
 class FractalNet(nn.Module):
     def __init__(self, data_shape, n_columns, channels, p_local_drop, dropout_probs,

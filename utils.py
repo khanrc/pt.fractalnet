@@ -32,6 +32,11 @@ def param_size(model):
     return n_params / 1000. / 1000.
 
 
+def get_module_device(module):
+    """ Get pytorch module device """
+    return next(module.parameters()).device
+
+
 class AverageMeter():
     """ Computes and stores the average and current value """
     def __init__(self):
