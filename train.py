@@ -10,23 +10,32 @@ import utils
 from fractal import FractalNet
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
+import functools
 
 
 config = Config()
 
+# setup FractalNet by config
+if config.gdrop_type == 'pb':
+    from fractal_pb import FractalNet # per-batch FractalNet
+elif config.gdrop_type == 'ps-consist':
+    FractalNet = functools.partial(FractalNet, consist_gdrop=True)
+else:
+    assert config.gdrop_type == 'ps'
+
 device = torch.device("cuda")
 
 # tensorboard
-writer = SummaryWriter(log_dir=os.path.join(config.name, "tb"))
+writer = SummaryWriter(log_dir=os.path.join(config.path, "tb"))
 writer.add_text('config', config.as_markdown(), 0)
 
 # logger
-logger = utils.get_logger(os.path.join(config.name, "{}.log".format(config.name)))
+logger = utils.get_logger(os.path.join(config.path, "{}.log".format(config.name)))
 logger.info("Run options = {}".format(sys.argv))
 config.print_params(logger.info)
 
 # copy scripts
-utils.copy_scripts("*.py", config.name)
+utils.copy_scripts("*.py", config.path)
 
 
 def main():
@@ -75,7 +84,7 @@ def main():
     criterion = nn.CrossEntropyLoss().to(device)
     model = FractalNet(data_shape, config.columns, channels=config.channels,
                        p_local_drop=config.p_local_drop, dropout_probs=config.dropout_probs,
-                       global_drop_ratio=config.global_drop_ratio, gap=config.gap,
+                       gdrop_ratio=config.gdrop_ratio, gap=config.gap,
                        init=config.init, pad_type=config.pad, doubling=config.doubling)
     model = model.to(device)
 
@@ -126,7 +135,7 @@ def main():
             is_best = True
         else:
             is_best = False
-        utils.save_checkpoint(model.state_dict(), config.name, is_best)
+        utils.save_checkpoint(model.state_dict(), config.path, is_best)
 
         print("")
 
@@ -153,8 +162,6 @@ def train(train_loader, model, optimizer, criterion, epoch):
         logits = model(X)
         loss = criterion(logits, y)
         loss.backward()
-        # gradient clipping
-        #nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
         optimizer.step()
 
         prec1, prec5 = utils.accuracy(logits, y, topk=(1, 5))

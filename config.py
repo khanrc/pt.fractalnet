@@ -5,13 +5,13 @@ import shutil
 
 
 class BaseConfig(argparse.Namespace):
-    def check_exists(self, name):
-        if os.path.exists(name):
+    def check_exists(self, path):
+        if os.path.exists(path) and not self.name.startswith("test"):
             while True:
-                r = input("The name `{}` is already exists. Delete? [y/N/q]: ".format(name))
+                r = input("The path `{}` is already exists. Delete? [y/N/q]: ".format(path))
                 r = r.lower().strip()
                 if r == 'y':
-                    shutil.rmtree(name)
+                    shutil.rmtree(path)
                     print("\n!!! Remove original directory !!!\n")
                     break
                 elif r in ['n', '']: # just enter is regarded as 'N'.
@@ -51,7 +51,7 @@ class Config(BaseConfig):
         parser.add_argument('--epochs', type=int, default=400,
                             help='# of training epochs (default: 400)')
         parser.add_argument('--channels', default="64,128,256,512,512")
-        parser.add_argument('--global_drop_ratio', type=float, default=0.5,
+        parser.add_argument('--gdrop_ratio', type=float, default=0.5,
                             help="ratio of global drop path (default: 0.5)")
         parser.add_argument('--p_local_drop', type=float, default=0.15,
                             help="local drop path probability (default: 0.15)")
@@ -61,7 +61,6 @@ class Config(BaseConfig):
         parser.add_argument('--seed', type=int, default=2, help='random seed')
         parser.add_argument('--workers', type=int, default=4, help='# of workers')
         #parser.add_argument('--cutout_length', type=int, default=16, help='cutout length')
-        #parser.add_argument('--drop_path_prob', type=float, default=0.2, help='drop path prob')
         #parser.add_argument('--resume')
         #parser.add_argument('--evaluate', action='store_true', default=False)
 
@@ -69,14 +68,15 @@ class Config(BaseConfig):
         exp_parser = parser.add_argument_group('Experiment')
         exp_parser.add_argument('--off-drops', action='store_true', default=False,
                                 help='turn off all dropout and droppath')
-        #  parser.add_argument('--gap', action='store_true', default=False)
         exp_parser.add_argument('--gap', type=int, default=0, help='0: max-pool, '
-                                '1: just replace last max-pool to avg-pool, 2: gap (no linear)')
+                                '1: GAP - FC, 2: 1x1conv - GAP')
         exp_parser.add_argument('--init', default='xavier',
                                 help='xavier / default (pytorch default)')
         exp_parser.add_argument('--pad', default='zero', help='zero / reflect')
         exp_parser.add_argument('--doubling', default=False, action='store_true',
                                 help='1x1 conv channel doubling')
+        exp_parser.add_argument('--gdrop_type', default='ps', help='ps (per-sample) / '
+                                'ps-consist (per-sample, consist global drop) / pb (per-batch)')
 
         return parser
 
@@ -85,7 +85,8 @@ class Config(BaseConfig):
         args = parser.parse_args()
         super().__init__(**vars(args))
 
-        self.check_exists(self.name)
+        self.path = os.path.join("./runs", self.name)
+        self.check_exists(self.path)
 
         self.data = self.data.lower().strip()
         self.data_path = './data/'
@@ -106,4 +107,4 @@ class Config(BaseConfig):
             for i in range(self.blocks):
                 self.dropout_probs[i] = 0.
             self.p_local_drop = 0.
-            self.global_drop_ratio = 0.
+            self.gdrop_ratio = 0.
