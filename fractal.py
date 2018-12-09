@@ -220,11 +220,15 @@ class FractalNet(nn.Module):
         self.layers = layers
 
         # initialization
-        if init == 'xavier':
-            # xavier init as in the paper
+        if init != 'default':
+            initialize_ = {
+                'xavier': nn.init.xavier_uniform_,
+                'he': nn.init.kaiming_uniform_
+            }[init]
+
             for n, p in self.named_parameters():
                 if p.dim() > 1: # weights only
-                    nn.init.xavier_uniform_(p)
+                    initialize_(p)
                 else: # bn w/b or bias
                     if 'bn.weight' in n:
                         nn.init.ones_(p)

@@ -71,7 +71,7 @@ class Config(BaseConfig):
         exp_parser.add_argument('--gap', type=int, default=0, help='0: max-pool, '
                                 '1: GAP - FC, 2: 1x1conv - GAP')
         exp_parser.add_argument('--init', default='xavier',
-                                help='xavier / default (pytorch default)')
+                                help='xavier / he / default (pytorch default)')
         exp_parser.add_argument('--pad', default='zero', help='zero / reflect')
         exp_parser.add_argument('--doubling', default=False, action='store_true',
                                 help='1x1 conv channel doubling')
