@@ -63,6 +63,8 @@ class Config(BaseConfig):
         #parser.add_argument('--cutout_length', type=int, default=16, help='cutout length')
         #parser.add_argument('--resume')
         #parser.add_argument('--evaluate', action='store_true', default=False)
+        parser.add_argument('--aug_lv', type=int, default=0,
+                            help='data augmentation level (0~2), 0: no augmentation.')
 
         # EXPERIMENTS
         exp_parser = parser.add_argument_group('Experiment')
@@ -75,7 +77,7 @@ class Config(BaseConfig):
         exp_parser.add_argument('--pad', default='zero', help='zero / reflect')
         exp_parser.add_argument('--doubling', default=False, action='store_true',
                                 help='1x1 conv channel doubling')
-        exp_parser.add_argument('--gdrop_type', default='ps', help='ps (per-sample) / '
+        exp_parser.add_argument('--gdrop_type', default='ps-consist', help='ps (per-sample) / '
                                 'ps-consist (per-sample, consist global drop) / pb (per-batch)')
 
         return parser

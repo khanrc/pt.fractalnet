@@ -143,12 +143,14 @@ class FractalBlock(nn.Module):
 
         return out
 
-    def forward(self, x, global_cols):
+    def forward(self, x, global_cols, deepest=False):
         out = self.doubler(x) if self.doubler else x
         outs = [out] * self.n_columns
         for i in range(self.max_depth):
             st = self.n_columns - self.count[i]
             cur_outs = [] # outs of current depth
+            if deepest:
+                st = self.n_columns - 1 # last column only
 
             for c in range(st, self.n_columns):
                 cur_in = outs[c] # current input
@@ -163,6 +165,7 @@ class FractalBlock(nn.Module):
                 outs[c] = joined
 
         return outs[0]
+
 
 class FractalNet(nn.Module):
     def __init__(self, data_shape, n_columns, channels, p_local_drop, dropout_probs,
@@ -235,16 +238,16 @@ class FractalNet(nn.Module):
                     else:
                         nn.init.zeros_(p)
 
-    def forward(self, x):
+    def forward(self, x, deepest=False):
         GB = int(x.size(0) * self.gdrop_ratio)
         out = x
-        first_fb = True
+        global_cols = None
         for layer in self.layers:
             if isinstance(layer, FractalBlock):
-                if not self.consist_gdrop or first_fb:
+                if not self.consist_gdrop or global_cols is None:
                     global_cols = np.random.randint(0, self.n_columns, size=[GB])
 
-                out = layer(out, global_cols)
+                out = layer(out, global_cols, deepest=deepest)
             else:
                 out = layer(out)
 

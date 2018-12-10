@@ -1,16 +1,15 @@
 """ Trainer """
 import os
 import sys
+import functools
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 from tensorboardX import SummaryWriter
 from config import Config
 import utils
 from fractal import FractalNet
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
-import functools
+from datasets import get_dataset
 
 
 config = Config()
@@ -52,33 +51,8 @@ def main():
 
     torch.backends.cudnn.benchmark = True
 
-    # dataset class
-    if config.data == 'cifar10':
-        dset_cls = dset.CIFAR10
-        data_shape = (3, 32, 32, 10)
-        MEAN = [0.49139968, 0.48215827, 0.44653124]
-        STD = [0.24703233, 0.24348505, 0.26158768]
-    elif config.data == 'cifar100':
-        dset_cls = dset.CIFAR100
-        data_shape = (3, 32, 32, 100)
-        raise NotImplementedError("required: MEAN, STD")
-    else:
-        raise ValueError(config.data)
-
-    # data transforms
-    trn_transforms = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(MEAN, STD)
-    ])
-    val_transforms = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(MEAN, STD)
-    ])
-
-
     # get dataset
-    train_data = dset_cls(config.data_path, train=True, download=True, transform=trn_transforms)
-    valid_data = dset_cls(config.data_path, train=False, download=True, transform=val_transforms)
+    train_data, valid_data, data_shape = get_dataset(config.data, config.data_path, config.aug_lv)
 
     # build model
     criterion = nn.CrossEntropyLoss().to(device)
