@@ -53,7 +53,7 @@ def get_dataset(data, path, aug_lv):
         ]
 
     # data transforms
-    trn_transforms = transforms.Compose([
+    trn_transforms = transforms.Compose(transf + [
         transforms.ToTensor(),
         transforms.Normalize(MEAN, STD)
     ])
