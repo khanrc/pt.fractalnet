@@ -147,14 +147,14 @@ Best results for CIFAR10 and CIFAR100. 3.91% and 21.64%, respectively.
 | Method                | C10       | C10+      | C10++     |
 | --------------------- | --------- | --------- | --------- |
 | Default               | 12.07%    | 6.06%     | 5.05%     |
-| + drop-path + dropout | 9.64%     | 6.44%     | 5.57%     |
-| => deepest            | 10.14%    | 7.19%     | 5.85%     |
+|   + drop-path + dropout | 9.64%     | 6.44%     | 5.57%     |
+|     => deepest            | 10.14%    | 7.19%     | 5.85%     |
 | Best                  | 10.87%    | 6.16%     | 5.19%     |
-| + drop-path + dropout | **8.47%** | 6.04%     | 5.49%     |
-| => deepest            | 9.47%     | 6.90%     | 6.09%     |
+|   + drop-path + dropout | **8.47%** | 6.04%     | 5.49%     |
+|     => deepest            | 9.47%     | 6.90%     | 6.09%     |
 | Paper                 | 10.18%    | 5.22%     | 5.11%     |
-| + drop-path + dropout | 7.33%     | 4.60%     | 4.59%     |
-| => deepest            | 7.27%     | 4.68%     | 4.63%     |
+|   + drop-path + dropout | 7.33%     | 4.60%     | 4.59%     |
+|     => deepest            | 7.27%     | 4.68%     | 4.63%     |
 | Best + FDO + local DP | 8.61%     | **5.25%** | **3.91%** |
 
 As mentioned before, the results of the paper were not reproduced. After several attempts, I've got the `best` option, which is `--init torch --gap 1 --pad reflect`. The `best` option got about 1.2% better than the default.
@@ -170,16 +170,17 @@ Furthermore, I got better results with less regularization. The last row is that
 | Method                              | C100       | C100+      | C100++     |
 | ----------------------------------- | ---------- | ---------- | ---------- |
 | Default                             |            |            |            |
-| + drop-path + dropout | 34.04%     | 28.71%     | 27.73%     |
-| => deepest                  | 36.69% | 31.95% | 30.66% |
+|   + drop-path + dropout | 34.04%     | 28.71%     | 27.73%     |
+|     => deepest                  | 36.69% | 31.95% | 30.66% |
 | Best                                | 36.99%     |            |            |
-| + drop-path + dropout | **31.84%** | 29.18%     | 29.04%     |
-| => deepest                  | 34.75% | 32.45% | 32.41% |
+|   + drop-path + dropout | **31.84%** | 29.18%     | 29.04%     |
+|     => deepest                  | 34.75% | 32.45% | 32.41% |
 | Paper                               | 35.34%     | 23.30%     | 22.85%     |
-| + drop-path + dropout | 28.20%     | 23.73%     | 23.36%     |
-| => deepest                  | 29.05%     | 24.32%     | 23.60%     |
+|   + drop-path + dropout | 28.20%     | 23.73%     | 23.36%     |
+|     => deepest                  | 29.05%     | 24.32%     | 23.60%     |
 | Best + FDO + local DP               | 32.11%     | **24.08%** | 22.02%     |
 | Best + FDO + local DP + doubling    | 33.65%     | 24.36%     | **21.64%** |
+
 Likewise C100, the paper results were not reproduced. In C100, I did not perform as many experiments as C10. But the results is similar - "Best + FDO + local DP" is better.
 
 However, there are some difference: default option is better than `best` option in C100+ and C100++, and the doubling works better in C100 than in C10.
