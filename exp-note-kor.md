@@ -71,11 +71,11 @@ This page is written in Korean.
 | -------------------------------- | --------- | --------- | --------- |
 | Default                          | 12.07%    | 6.06%     | 5.05%     |
 | Default + DO + DP                | 9.64%     | 6.44%     | 5.57%     |
-|   => deepest                       | 10.14%    | 7.19%     | 5.85%     |
+| ⠀⠀=> deepest                       | 10.14%    | 7.19%     | 5.85%     |
 | Default + DO + local DP          | 9.52%     | 5.81%     | 4.48%     |
 | Best                             | 10.87%    | 6.16%     | 5.19%     |
 | Best + DO + DP                   | **8.47%** | 6.04%     | 5.49%     |
-|   => deepest                       | 9.47%     | 6.90%     | 6.09%     |
+| ⠀⠀=> deepest                       | 9.47%     | 6.90%     | 6.09%     |
 | Best + DO + DP + doubling        | 9.09%     | 5.93%     | 5.09%     |
 | Best + DO + local DP             | **8.47%** | 5.31%     | 4.20%     |
 | Best + DO + local DP + doubling  | 8.87%     | 5.47%     | 4.09%     |
@@ -83,7 +83,7 @@ This page is written in Korean.
 | Best + FDO + local DP + doubling |           | 5.30%     | 3.96%     |
 | Paper                            | 10.18%    | 5.22%     | 5.11%     |
 | Paper + DO + DP                  | 7.33%     | 4.60%     | 4.59%     |
-|   => deepest                       | 7.27%     | 4.68%     | 4.63%     |
+| ⠀⠀=> deepest                       | 7.27%     | 4.68%     | 4.63%     |
 
 - Default
   - 논문 그대로 구현
@@ -110,11 +110,11 @@ This page is written in Korean.
 | ----------------------------------- | ---------- | ---------- | ---------- |
 | Default                             |            |            |            |
 | Default + DO + DP                   | 34.04%     | 28.71%     | 27.73%     |
-|   => deepest                          | 36.69%     | 31.95%     | 30.66%     |
+| ⠀⠀=> deepest                          | 36.69%     | 31.95%     | 30.66%     |
 | Default + FDO + local DP + doubling |            |            | 25.76%     |
 | Best                                | 36.99%     |            |            |
 | Best + DO + DP                      | **31.84%** | 29.18%     | 29.04%     |
-|   => deepest                          | 34.75%     | 32.45%     | 32.41%     |
+| ⠀⠀=> deepest                          | 34.75%     | 32.45%     | 32.41%     |
 | Best + DO + DP + doubling           |            |            | 25.26%     |
 | Best + DO + local DP                |            |            | 22.85%     |
 | Best + DO + local DP + doubling     |            |            | 21.94%     |
@@ -122,7 +122,7 @@ This page is written in Korean.
 | Best + FDO + local DP + doubling    | 33.65%     | 24.36%     | **21.64%** |
 | Paper                               | 35.34%     | 23.30%     | 22.85%     |
 | Paper + DO + DP                     | 28.20%     | 23.73%     | 23.36%     |
-|   => deepest                          | 29.05%     | 24.32%     | 23.60%     |
+| ⠀⠀=> deepest                          | 29.05%     | 24.32%     | 23.60%     |
 
 - 흥미로운 점은, C100+ 과 C100++ 에서 best 에 비해 default 가 좋은 성능을 보임
   - 그러나 local DP 등의 변주를 주었을 때에는 best 가 더 좋았음
