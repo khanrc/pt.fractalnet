@@ -1,7 +1,6 @@
 """ Trainer """
 import os
 import sys
-import functools
 import numpy as np
 import torch
 import torch.nn as nn
@@ -13,15 +12,6 @@ from datasets import get_dataset
 
 
 config = Config()
-
-# setup FractalNet by config
-if config.gdrop_type == 'pb':
-    from fractal_pb import FractalNet # per-batch FractalNet
-elif config.gdrop_type == 'ps-consist':
-    FractalNet = functools.partial(FractalNet, consist_gdrop=True)
-else:
-    assert config.gdrop_type == 'ps'
-
 device = torch.device("cuda")
 
 # tensorboard
@@ -56,10 +46,11 @@ def main():
 
     # build model
     criterion = nn.CrossEntropyLoss().to(device)
-    model = FractalNet(data_shape, config.columns, channels=config.channels,
-                       p_local_drop=config.p_local_drop, dropout_probs=config.dropout_probs,
+    model = FractalNet(data_shape, config.columns, config.init_channels,
+                       p_ldrop=config.p_ldrop, dropout_probs=config.dropout_probs,
                        gdrop_ratio=config.gdrop_ratio, gap=config.gap,
-                       init=config.init, pad_type=config.pad, doubling=config.doubling)
+                       init=config.init, pad_type=config.pad, doubling=config.doubling,
+                       dropout_pos=config.dropout_pos, consist_gdrop=config.consist_gdrop)
     model = model.to(device)
 
     # model size
@@ -82,14 +73,6 @@ def main():
                                                num_workers=config.workers,
                                                pin_memory=True)
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, config.lr_milestone)
-
-    # evaluate
-    #  if config.evaluate:
-    #      if os.path.isfile(config.evaluate):
-    #          ckpt = torch.load(config.evaluate)
-    #          model.load_state_dict(ckpt)
-
-    #      top1 = validate(valid_loader, model, criterion, epoch=0, cur_step=0)
 
     best_top1 = 0.
     # training loop
@@ -158,7 +141,7 @@ def train(train_loader, model, optimizer, criterion, epoch):
     logger.info("Train: [{:3d}/{}] Final Prec@1 {:.4%}".format(epoch+1, config.epochs, top1.avg))
 
 
-def validate(valid_loader, model, criterion, epoch, cur_step):
+def validate(valid_loader, model, criterion, epoch, cur_step, deepest=False):
     top1 = utils.AverageMeter()
     top5 = utils.AverageMeter()
     losses = utils.AverageMeter()
@@ -170,7 +153,7 @@ def validate(valid_loader, model, criterion, epoch, cur_step):
             X, y = X.to(device, non_blocking=True), y.to(device, non_blocking=True)
             N = X.size(0)
 
-            logits = model(X)
+            logits = model(X, deepest=deepest)
             loss = criterion(logits, y)
 
             prec1, prec5 = utils.accuracy(logits, y, topk=(1, 5))

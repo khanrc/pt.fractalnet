@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import utils
 
 
 class Flatten(nn.Module):
@@ -14,9 +13,16 @@ class Flatten(nn.Module):
 class ConvBlock(nn.Module):
     """ Conv - Dropout - BN - ReLU """
     def __init__(self, C_in, C_out, kernel_size=3, stride=1, padding=1, dropout=None,
-                 pad_type='zero'):
+                 pad_type='zero', dropout_pos='CDBR'):
+        """ Conv
+        Args:
+            - dropout_pos: the position of dropout
+                - CDBR (default): conv-dropout-BN-relu
+                - CBRD: conv-BN-relu-dropout
+                - FD: fractal-dropout
+        """
         super().__init__()
-
+        self.dropout_pos = dropout_pos
         if pad_type == 'zero':
             self.pad = nn.ZeroPad2d(padding)
         elif pad_type == 'reflect':
@@ -35,39 +41,50 @@ class ConvBlock(nn.Module):
     def forward(self, x):
         out = self.pad(x)
         out = self.conv(out)
-        if self.dropout:
+        if self.dropout_pos == 'CDBR' and self.dropout:
             out = self.dropout(out)
         out = self.bn(out)
         out = F.relu_(out)
+        if self.dropout_pos == 'CBRD' and self.dropout:
+            out = self.dropout(out)
 
         return out
 
 
 class FractalBlock(nn.Module):
-    def __init__(self, n_columns, C_in, C_out, p_local_drop, p_dropout, pad_type='zero',
-                 doubling=False):
+    def __init__(self, n_columns, C_in, C_out, p_ldrop, p_dropout, pad_type='zero',
+                 doubling=False, dropout_pos='CDBR'):
         """ Fractal block
         Args:
             - n_columns: # of columns
             - C_in: channel_in
             - C_out: channel_out
-            - p_local_drop: local droppath prob
+            - p_ldrop: local droppath prob
             - p_dropout: dropout prob
             - pad_type: padding type of conv
             - doubling: if True, doubling by 1x1 conv in front of the block.
+            - dropout_pos: the position of dropout
+                - CDBR (default): conv-dropout-BN-relu
+                - CBRD: conv-BN-relu-dropout
+                - FD: fractal_block-dropout
         """
         super().__init__()
 
         self.n_columns = n_columns
-        self.columns = nn.ModuleList([nn.ModuleList() for _ in range(n_columns)])
-        self.max_depth = 2 ** (n_columns-1)
-        self.p_local_drop = p_local_drop
+        self.p_ldrop = p_ldrop
+        self.dropout_pos = dropout_pos
+        if dropout_pos == 'FD':
+            self.dropout = nn.Dropout2d(p=p_dropout)
+            p_dropout = 0.
 
         if doubling:
             #self.doubler = nn.Conv2d(C_in, C_out, 1, padding=0)
             self.doubler = ConvBlock(C_in, C_out, 1, padding=0)
         else:
             self.doubler = None
+
+        self.columns = nn.ModuleList([nn.ModuleList() for _ in range(n_columns)])
+        self.max_depth = 2 ** (n_columns-1)
 
         dist = self.max_depth
         self.count = np.zeros([self.max_depth], dtype=np.int)
@@ -80,7 +97,9 @@ class FractalBlock(nn.Module):
                         cur_C_in = C_in
                     else:
                         cur_C_in = C_out
-                    module = ConvBlock(cur_C_in, C_out, dropout=p_dropout, pad_type=pad_type)
+
+                    module = ConvBlock(cur_C_in, C_out, dropout=p_dropout, pad_type=pad_type,
+                                       dropout_pos=dropout_pos)
                     self.count[i] += 1
                 else:
                     module = None
@@ -112,15 +131,14 @@ class FractalBlock(nn.Module):
 
         # local drop mask
         LB = B - GB
-        ldrop_mask = np.random.binomial(1, 1.-self.p_local_drop, [n_cols, LB]).astype(np.float32)
+        ldrop_mask = np.random.binomial(1, 1.-self.p_ldrop, [n_cols, LB]).astype(np.float32)
         alive_count = ldrop_mask.sum(axis=0)
         # resurrect all-dead case
         dead_indices = np.where(alive_count == 0.)[0]
         ldrop_mask[np.random.randint(0, n_cols, size=dead_indices.shape), dead_indices] = 1.
 
         drop_mask = np.concatenate((gdrop_mask, ldrop_mask), axis=1)
-        device = utils.get_module_device(self)
-        return torch.from_numpy(drop_mask).to(device)
+        return torch.from_numpy(drop_mask)
 
     def join(self, outs, global_cols):
         """
@@ -132,10 +150,10 @@ class FractalBlock(nn.Module):
         out = torch.stack(outs) # [n_cols, B, C, H, W]
 
         if self.training:
-            masks = self.drop_mask(outs[0].size(0), global_cols, n_cols) # [n_cols, B]
-            masks = masks.view(*masks.size(), 1, 1, 1) # unsqueeze to [n_cols, B, 1, 1, 1]
-            n_alive = masks.sum(dim=0) # [B, 1, 1, 1]
-            masked_out = out * masks # [n_cols, B, C, H, W]
+            mask = self.drop_mask(out.size(1), global_cols, n_cols).to(out.device) # [n_cols, B]
+            mask = mask.view(*mask.size(), 1, 1, 1) # unsqueeze to [n_cols, B, 1, 1, 1]
+            n_alive = mask.sum(dim=0) # [B, 1, 1, 1]
+            masked_out = out * mask # [n_cols, B, C, H, W]
             n_alive[n_alive == 0.] = 1. # all-dead cases
             out = masked_out.sum(dim=0) / n_alive # [B, C, H, W] / [B, 1, 1, 1]
         else:
@@ -144,6 +162,9 @@ class FractalBlock(nn.Module):
         return out
 
     def forward(self, x, global_cols, deepest=False):
+        """
+        global_cols works only in training mode.
+        """
         out = self.doubler(x) if self.doubler else x
         outs = [out] * self.n_columns
         for i in range(self.max_depth):
@@ -164,40 +185,53 @@ class FractalBlock(nn.Module):
             for c in range(st, self.n_columns):
                 outs[c] = joined
 
-        return outs[0]
+        if self.dropout_pos == 'FD':
+            outs[-1] = self.dropout(outs[-1])
+
+        return outs[-1] # for deepest case
 
 
 class FractalNet(nn.Module):
-    def __init__(self, data_shape, n_columns, channels, p_local_drop, dropout_probs,
+    def __init__(self, data_shape, n_columns, init_channels, p_ldrop, dropout_probs,
                  gdrop_ratio, gap=0, init='xavier', pad_type='zero', doubling=False,
-                 consist_gdrop=False):
-        """
+                 consist_gdrop=True, dropout_pos='CDBR'):
+        """ FractalNet
         Args:
             - data_shape: (C, H, W, n_classes). e.g. (3, 32, 32, 10) - CIFAR 10.
             - n_columns: the number of columns
-            - channels: channel outs (list)
-            - p_local_drop: local drop prob
+            - init_channels: the number of out channels in the first block
+            - p_ldrop: local drop prob
             - dropout_probs: dropout probs (list)
             - gdrop_ratio: global droppath ratio
+            - gap: pooling type for last block
+            - init: initializer type
+            - pad_type: padding type of conv
+            - doubling: if True, doubling by 1x1 conv in front of the block.
+            - consist_gdrop
+            - dropout_pos: the position of dropout
+                - CDBR (default): conv-dropout-BN-relu
+                - CBRD: conv-BN-relu-dropout
+                - FD: fractal_block-dropout
         """
         super().__init__()
-        self.B = len(channels) # the number of blocks
+        assert dropout_pos in ['CDBR', 'CBRD', 'FD']
+
+        self.B = len(dropout_probs) # the number of blocks
         self.consist_gdrop = consist_gdrop
         self.gdrop_ratio = gdrop_ratio
         self.n_columns = n_columns
         C_in, H, W, n_classes = data_shape
-        assert len(channels) == len(dropout_probs)
+
         assert H == W
         size = H
 
         layers = nn.ModuleList()
-        C_out = C_in # work like C_out of block0 == data channels.
+        C_out = init_channels
         total_layers = 0
-        for b, (C, p_dropout) in enumerate(zip(channels, dropout_probs)):
-            C_in, C_out = C_out, C
-            #print("Channel in = {}, Channel out = {}".format(C_in, C_out))
-            fb = FractalBlock(n_columns, C_in, C_out, p_local_drop, p_dropout,
-                              pad_type=pad_type, doubling=doubling)
+        for b, p_dropout in enumerate(dropout_probs):
+            print("[block {}] Channel in = {}, Channel out = {}".format(b, C_in, C_out))
+            fb = FractalBlock(n_columns, C_in, C_out, p_ldrop, p_dropout,
+                              pad_type=pad_type, doubling=doubling, dropout_pos=dropout_pos)
             layers.append(fb)
             if gap == 0 or b < self.B-1:
                 # Originally, every pool is max-pool in the paper (No GAP).
@@ -208,22 +242,25 @@ class FractalNet(nn.Module):
 
             size //= 2
             total_layers += fb.max_depth
+            C_in = C_out
+            if b < self.B-2:
+                C_out *= 2 # doubling except for last block
 
         print("Last featuremap size = {}".format(size))
         print("Total layers = {}".format(total_layers))
 
         if gap == 2:
-            layers.append(nn.Conv2d(channels[-1], 10, 1, padding=0)) # 1x1 conv
+            layers.append(nn.Conv2d(C_out, n_classes, 1, padding=0)) # 1x1 conv
             layers.append(nn.AdaptiveAvgPool2d(1)) # gap
             layers.append(Flatten())
         else:
             layers.append(Flatten())
-            layers.append(nn.Linear(channels[-1] * size * size, n_classes)) # fc layer
+            layers.append(nn.Linear(C_out * size * size, n_classes)) # fc layer
 
         self.layers = layers
 
         # initialization
-        if init != 'default':
+        if init != 'torch':
             initialize_ = {
                 'xavier': nn.init.xavier_uniform_,
                 'he': nn.init.kaiming_uniform_
@@ -239,6 +276,8 @@ class FractalNet(nn.Module):
                         nn.init.zeros_(p)
 
     def forward(self, x, deepest=False):
+        if deepest:
+            assert self.training is False
         GB = int(x.size(0) * self.gdrop_ratio)
         out = x
         global_cols = None
