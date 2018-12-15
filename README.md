@@ -1,6 +1,6 @@
 # FractalNet: Ultra-deep neural networks without residuals.
 
-PyTorch Implementation of FractalNet
+PyTorch Implementation of FractalNet.
 
 Larsson, Gustav, Michael Maire, and Gregory Shakhnarovich. "Fractalnet: Ultra-deep neural networks without residuals." *arXiv preprint arXiv:1605.07648* (2016).
 
@@ -41,7 +41,7 @@ python test.py --data cifar10 --name cifar10-best --init torch --gap 1 --pad ref
 
 #### Train
 
-```bash
+```
 $ python train.py --help
 usage: Config [-h] --name NAME [--data DATA] [--batch_size BATCH_SIZE]
               [--lr LR] [--momentum MOMENTUM] [--print_freq PRINT_FREQ]
@@ -97,7 +97,7 @@ Experiment:
 
 #### Test
 
-```bash
+```
 $ python test.py --help
 usage: Config [-h] --name NAME [--data DATA] [--batch_size BATCH_SIZE]
               [--print_freq PRINT_FREQ] [--gpu GPU]
@@ -155,11 +155,7 @@ Best results for CIFAR10 and CIFAR100. 3.91% and 21.64%, respectively.
 
 As mentioned before, the results of the paper were not reproduced. After several attempts, I've got the `best` option, which is `--init torch --gap 1 --pad reflect`. The `best` option got about 1.2% better than the default.
 
-Furthermore, I got better results with less regularization. The last row is that: "Best + FDO (Fractal dropout) + local DP (No global drop-path)". The run option is:
-
-```bash
---init torch --gap 1 --pad reflect --global_drop_ratio 0. --dropout_pos FD
-```
+Furthermore, I got better results with less regularization. The last row is that: "Best + FDO (Fractal dropout) + local DP (No global drop-path)". The run option is `--init torch --gap 1 --pad reflect --global_drop_ratio 0. --dropout_pos FD`.
 
 ### CIFAR100
 
