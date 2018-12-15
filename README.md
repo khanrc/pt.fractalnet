@@ -173,7 +173,7 @@ Furthermore, I got better results with less regularization. The last row is that
 | ⠀⠀⠀⠀=> deepest                  | 34.75% | 32.45% | 32.41% |
 | Paper                               | 35.34%     | 23.30%     | 22.85%     |
 | ⠀⠀+ drop-path + dropout | 28.20%     | 23.73%     | 23.36%     |
-|⠀⠀⠀⠀ => deepest                  | 29.05%     | 24.32%     | 23.60%     |
+| ⠀⠀⠀⠀=> deepest                  | 29.05%     | 24.32%     | 23.60%     |
 | Best + FDO + local DP               | 32.11%     | **24.08%** | 22.02%     |
 | Best + FDO + local DP + doubling    | 33.65%     | 24.36%     | **21.64%** |
 
