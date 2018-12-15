@@ -1,4 +1,4 @@
-# FractalNet: Ultra-deep neural networks without residuals.
+# FractalNet: Ultra-deep neural networks without residuals
 
 PyTorch Implementation of FractalNet.
 
