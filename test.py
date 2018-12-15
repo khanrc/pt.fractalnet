@@ -60,8 +60,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss().to(device)
     model = FractalNet(data_shape, config.columns, config.init_channels, p_ldrop=0.,
                        dropout_probs=[0.]*config.blocks, gdrop_ratio=0., gap=config.gap,
-                       pad_type=config.pad, doubling=config.doubling,
-                       dropout_pos=config.dropout_pos)
+                       pad_type=config.pad, doubling=config.doubling)
     model = model.to(device)
 
     valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=config.batch_size,

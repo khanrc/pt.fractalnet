@@ -73,9 +73,11 @@ class FractalBlock(nn.Module):
         self.n_columns = n_columns
         self.p_ldrop = p_ldrop
         self.dropout_pos = dropout_pos
-        if dropout_pos == 'FD':
+        if dropout_pos == 'FD' and p_dropout > 0.:
             self.dropout = nn.Dropout2d(p=p_dropout)
             p_dropout = 0.
+        else:
+            self.dropout = None
 
         if doubling:
             #self.doubler = nn.Conv2d(C_in, C_out, 1, padding=0)
@@ -185,7 +187,7 @@ class FractalBlock(nn.Module):
             for c in range(st, self.n_columns):
                 outs[c] = joined
 
-        if self.dropout_pos == 'FD':
+        if self.dropout_pos == 'FD' and self.dropout:
             outs[-1] = self.dropout(outs[-1])
 
         return outs[-1] # for deepest case
